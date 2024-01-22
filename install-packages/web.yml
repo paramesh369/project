@@ -1,0 +1,48 @@
+- name: Installing Web
+  hosts: all
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Install Nginx
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+    
+    - name: start and enable the nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: remove default html directory
+      ansible.builtin.file:
+        path: /usr/share/nginx/html
+        state: absent
+      
+    - name: create html directory
+      ansible.builtin.file:
+        path: /usr/share/nginx/html
+        state: directory
+
+    - name: Download the frontend content to tmp directory
+      ansible.builtin.get_url:
+        url: https://roboshop-builds.s3.amazonaws.com/web.zip
+        dest: /tmp
+
+    - name: unzip the frontend content
+      ansible.builtin.unarchive:
+        path: /tmp/web.zip
+        dest: /usr/share/nginx/html
+        remote_src: yes
+
+    - name: copy the roboshop config file
+      ansible.builtin.copy:
+        src: roboshop.conf
+        dest: /etc/nginx/default.d/roboshop.conf
+
+    - name: Restart the nginx server
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+        enabled: yes
+        
