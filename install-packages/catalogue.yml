@@ -1,0 +1,77 @@
+- name: Install and start the catalogue service
+  hosts: all
+  become: true
+  become_method: sudo
+  tasks:
+    - name: disable and enable nodejs
+      ansible.builtin.shell: dnf module disable nodejs -y ; dnf module enable nodejs:18 -y
+
+    - name: Install nodejs:18
+      ansible.builtin.package:
+        name: nodejs:18
+        state: present
+
+    - name: create the roboshop user
+      ansible.builtin.user:
+        name: roboshop
+        state: present
+
+    - name: create app directory
+      ansible.builtin.file:
+        path: /app
+        state: directory
+
+    - name: download the code to tmp directory
+      get_url:
+        url: https://roboshop-builds.s3.amazonaws.com/catalogue.zip
+        dest: /tmp
+
+    - name: Extract the application code
+      ansible.builtin.unarchive:
+        src: /tmp/catalogue.zip
+        dest: /app
+        remote_src: yes
+
+    - name: Install dependencies
+      ansible.builtin.command: npm install
+      args:
+        chdir: /app # we need to install the dependencies in /app directory otherwise it will get an error
+
+    - name: copy the catalogue service 
+      ansible.builtin.copy:
+        src: catalogue.service
+        dest: /etc/systemd/system/catalogue.service
+
+    - name: Reload the daemon
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    # Let's start the catalogue service after the mongodb data is loaded
+
+    - name: copy the mongodb repo
+      ansible.builtin.copy:
+        src: mongo.repo
+        dest: /etc/yum.repos.d/mongo.repo
+
+    - name: Install the mongodb client
+      ansible.builtin.package:
+        name: mongodb-org-shell
+        state: present
+
+    - name: get the categories count
+      ansible.builtin.command: mongo --host <MONGO-IP-ADDRESS> --quiet --eval 'db = db.getSiblingDB("catalogue"); db.products.count()'
+      register: product_count
+
+    - name: Load catalogue data
+      ansible.builtin.command: mongo --host MONGODB-SERVER-IPADDRESS < /app/schema/catalogue.js
+      when: product_count.stdout == 0
+
+    - name: start and enable catalogue service
+      ansible.builtin.service:
+        name: catalogue
+        state: restarted
+        enabled: yes
+
+# verify the logs by going to root access and execute the command 'tail -f /var/logs/messages'
+
+
