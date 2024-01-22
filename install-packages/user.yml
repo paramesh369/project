@@ -1,0 +1,71 @@
+- name: creating user
+  hosts: all
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Disabling and Enabling nodejs
+      ansible.builtin.shell: dnf module disable nodejs -y ; dnf module enable nodejs:18 -y
+
+    - name: Install nodejs:18
+      ansible.builtin.dnf:
+        name: nodejs:18
+        state: present
+
+    - name: create an user
+      ansible.builtin.user:
+        name: roboshop
+        state: present
+
+    - name: create an app directory
+      ansible.builtin.file:
+        path: /app
+        state: directory
+      
+    - name: Download the user zip file
+      ansible.builtin.get_url:
+        url: https://roboshop-builds.s3.amazonaws.com/user.zip
+        dest: /tmp
+
+    - name: unzip the file
+      ansible.builtin.unarchive:
+        src: /tmp/user.zip
+        dest: /app
+        remote_src: yes
+
+    - name: Download the dependencies
+      ansible.builtin.command: npm install
+      args:
+        chdir: /app
+
+    - name: copy the user service file
+      ansible.builtin.copy:
+        src: user.service
+        dest: /etc/systemd/system/user.service
+
+    - name: reload the daemon
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: copy the mongo repo
+      ansible.builtin.copy:
+        src: mongo.repo
+        dest: /etc/yum.repos.d/mongo.repo
+
+    - name: Install mongodb client
+      ansible.builtin.dnf:
+        name: mongodb-org-shell
+        state: present
+
+    - name: get the users count
+      ansible.builtin.command: mongo --host <MONGO-IP-ADDRESS> --quiet --eval 'db = db.getSiblingDB("users"); db.users.count()'
+      register: user_count
+
+    - name: Load users data
+      ansible.builtin.command: mongo --host MONGODB-SERVER-IPADDRESS < /app/schema/user.js
+      when: user_count.stdout == "0"
+
+    - name: start and enable user
+      ansible.builtin.service:
+        name: user
+        state: started
+        enabled: yes
