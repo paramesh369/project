@@ -1,0 +1,23 @@
+- name: copy the mongodb repo
+  ansible.builtin.copy:
+    src: mongo.repo
+    dest: /etc/yum.repos.d/mongo.repo
+
+- name: Install the mongodb client
+  ansible.builtin.package:
+    name: mongodb-org-shell
+    state: present
+
+- name: get the entries count
+  ansible.builtin.command: mongo --host <MONGO-IP-ADDRESS> --quiet --eval 'db = db.getSiblingDB("catalogue"); db.products.count()'
+  register: entries_count
+  when: component == "catalogue"
+
+- name: get the entries count
+  ansible.builtin.command: mongo --host <MONGO-IP-ADDRESS> --quiet --eval 'db = db.getSiblingDB("users"); db.users.count()'
+  register: entries_count
+  when: component == "users"
+
+- name: "Load {{component}} data"
+  ansible.builtin.command: "mongo --host MONGODB-SERVER-IPADDRESS < /app/schema/{{component}}.js"
+  when: entries_count.stdout == 0
