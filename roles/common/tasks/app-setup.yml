@@ -1,8 +1,3 @@
-- name: Install nodejs:18
-  ansible.builtin.package:
-    name: nodejs:18
-    state: present
-
 - name: create the roboshop user
   ansible.builtin.user:
     name: roboshop
