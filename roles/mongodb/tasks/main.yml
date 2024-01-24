@@ -1,4 +1,26 @@
-- name: "install {{component}}" # compoent is a variable where we are passing the value while executing the playbook on runtime
-  hosts: "{{component}}"
-  roles:
-    - "{{component}}"
+- name: copy mongodb repo
+  ansible.builtin.copy:
+    src: mongo.repo
+    dest: /etc/yum.repos.d/mongo.repo
+
+- name: Install mongodb
+  ansible.builtin.package:
+    name: mongodb-org
+    state: present
+
+- name: Start and enable the mongodb server
+  ansible.builtin.service:
+    name: mongod
+    state: started
+    enabled: yes
+
+- name: Replace IP and allow remote connections
+  ansible.builtin.replace:
+    path: /etc/mongod.conf
+    regexp: '127.0.0.1'
+    replace: '0.0.0.0'
+
+- name: Restart the mongodb server
+  ansible.builtin.service:
+    name: mongod
+    state: restarted
