@@ -1,0 +1,4 @@
+- name: "install {{component}}" # compoent is a variable where we are passing the value while executing the playbook on runtime
+  hosts: "{{component}}"
+  roles:
+    - "{{component}}"
